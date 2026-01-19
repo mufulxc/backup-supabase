@@ -1,0 +1,21 @@
+name: Backup database
+
+on:
+  schedule:
+    - cron: '56 05 * * *'  # 每天 UTC 0:00
+  workflow_dispatch:
+
+jobs:
+  backup:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v4
+      - uses: supabase/setup-cli@v1
+        with:
+          version: latest
+      - run: supabase db dump --db-url ${{ secrets.SUPABASE_DB_URL }} -f backup.sql
+      - uses: stefanzweifel/git-auto-commit-action@v5
+        with:
+          commit_message: Supabase backup
