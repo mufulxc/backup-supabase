@@ -1,33 +1,30 @@
-name: Supabase Daily Backup
+name: Daily Supabase Backup
 
 on:
   schedule:
-    - cron: '56 22 * * *'  # 每天 UTC 22:56（北京时间次日 06:56）。想改北京 22:56 用 '56 14 * * *'
-  workflow_dispatch:  # 允许手动触发测试
+    - cron: '0 0 * * *'          # 每天 UTC 00:00 执行（可改成你想要的时间）
+  workflow_dispatch:             # 允许手动触发
 
 jobs:
   backup:
     runs-on: ubuntu-latest
     permissions:
-      contents: write  # 必须有，才能 git commit
+      contents: write              # 必须有写权限才能 commit
 
     steps:
-      - name: Checkout repository
-        uses: actions/checkout@v4
-
-      - name: Setup Supabase CLI
-        uses: supabase/setup-cli@v1
+      - uses: actions/checkout@v4
         with:
-          version: latest
+          ref: ${{ github.head_ref || github.ref_name }}
 
-      - name: Dump schema (结构 + 函数 + 权限等)
-        run: supabase db dump --db-url "${{ secrets.SUPABASE_DB_URL }}" -f supabase_schema_$(date +'%Y-%m-%d').sql
+      - name: Supabase Backup
+        uses: mansueli/supa-backup@v1.0.5
+        with:
+          supabase_url: ${{ secrets.SUPABASE_DB_URL }}   # postgresql://postgres.[project-ref]:[your-password]@db.[project-ref].supabase.co:6543/postgres
+          file_prefix: 'backup-'                         # 可选，文件名前缀
+          pg_dump_args: '--exclude-schema=auth --exclude-schema=storage --exclude-schema=supabase_functions'  # 可选，排除系统 schema
 
-      - name: Dump data (表数据，使用 COPY 加速)
-        run: supabase db dump --db-url "${{ secrets.SUPABASE_DB_URL }}" -f supabase_data_$(date +'%Y-%m-%d').sql --data-only --use-copy
-
-      - name: Commit backup files to repo
+      - name: Commit backup
         uses: stefanzweifel/git-auto-commit-action@v5
         with:
-          commit_message: "Daily Supabase backup - $(date +'%Y-%m-%d')"
-          file_pattern: supabase_*.sql  # 只 commit 今天的备份文件
+          commit_message: "chore: daily supabase backup $(date +'%Y-%m-%d')"
+          file_pattern: '*.sql *.dump'   # 根据你生成的备份文件后缀
